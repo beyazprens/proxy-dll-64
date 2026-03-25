@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{7A3F1E8B-4C29-4D5E-B6F7-8A9B0C1D2E3F}</ProjectGuid>
+    <RootNamespace>winmm</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <!-- v143 = VS 2022 ; change to v142 for VS 2019 -->
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <!-- Enable MASM assembler for winmm_stubs.asm -->
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+
+  <ImportGroup Label="Sheets">
+    <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props"
+              Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')"
+              Label="LocalAppDataPlatform" />
+    </ImportGroup>
+  </ImportGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <!-- Output: <solution>\bin\Release\winmm.dll -->
+    <OutDir>$(SolutionDir)bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Configuration)\winmm\</IntDir>
+    <TargetName>winmm</TargetName>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>BUILD_DLL;NDEBUG;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <!-- winmm.def lists all 180 exported functions -->
+      <ModuleDefinitionFile>winmm.def</ModuleDefinitionFile>
+      <AdditionalDependencies>user32.lib;shlwapi.lib;kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <TargetMachine>MachineX64</TargetMachine>
+    </Link>
+    <MASM>
+      <!-- /safeseh is not supported for x64; the option below silences the warning -->
+      <UseSafeExceptionHandlers>false</UseSafeExceptionHandlers>
+    </MASM>
+  </ItemDefinitionGroup>
+
+  <!-- C++ source files -->
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ManualMap.cpp" />
+    <ClCompile Include="..\sharedcode\Logging.cpp" />
+    <ClCompile Include="..\sharedcode\PluginLoader.cpp" />
+  </ItemGroup>
+
+  <!-- MASM assembly stubs (replaces GCC inline asm for MSVC builds) -->
+  <ItemGroup>
+    <MASM Include="winmm_stubs.asm" />
+  </ItemGroup>
+
+  <!-- Headers -->
+  <ItemGroup>
+    <ClInclude Include="main.h" />
+    <ClInclude Include="ManualMap.h" />
+    <ClInclude Include="..\sharedcode\Logging.h" />
+    <ClInclude Include="..\sharedcode\PluginLoader.h" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>

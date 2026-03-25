@@ -33,6 +33,8 @@
 		<Unit filename="../sharedcode/PluginLoader.h" />
 		<Unit filename="main.cpp" />
 		<Unit filename="main.h" />
+		<Unit filename="ManualMap.cpp" />
+		<Unit filename="ManualMap.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />

@@ -5,11 +5,16 @@
 #define _INC_MMSYSTEM
 
 #include "main.h"
+#include "ManualMap.h"
 #include "../sharedcode/Logging.h"
 #include "../sharedcode/PluginLoader.h"
 
 HMODULE originalWINMM = NULL;
-UINT64 p[180];
+// C linkage so the MASM stub file (winmm_stubs.asm) can reference this array
+// by the undecorated symbol 'p' when building with MSVC.
+extern "C" { UINT64 p[180]; }
+
+static HINSTANCE g_hInstance = NULL;
 
 void loadOriginalWINMM()
 {
@@ -211,6 +216,51 @@ DWORD WINAPI Start(LPVOID lpParam)
         logEnd();
         return 0;
     }
+
+    // Read proxy.ini sitting next to winmm.dll.
+    // [Proxy]
+    // DllPath=proxy.dll          <- relative: resolved to winmm.dll's folder
+    // DllPath=C:\full\path.dll   <- absolute: used as-is
+    char iniPath[MAX_PATH];
+    GetModuleFileNameA(g_hInstance, iniPath, MAX_PATH);
+    PathRemoveFileSpecA(iniPath);
+    PathAppendA(iniPath, "proxy.ini");
+
+    char dllPath[MAX_PATH] = {0};
+    GetPrivateProfileStringA("Proxy", "DllPath", "", dllPath, MAX_PATH, iniPath);
+
+    if (dllPath[0] != '\0')
+    {
+        char resolvedPath[MAX_PATH];
+
+        // Resolve a relative path relative to the directory containing winmm.dll.
+        if (PathIsRelativeA(dllPath))
+        {
+            GetModuleFileNameA(g_hInstance, resolvedPath, MAX_PATH);
+            PathRemoveFileSpecA(resolvedPath);
+            PathAppendA(resolvedPath, dllPath);
+        }
+        else
+        {
+            strncpy(resolvedPath, dllPath, MAX_PATH - 1);
+            resolvedPath[MAX_PATH - 1] = '\0';
+        }
+
+        // Silently do nothing if the file is not present.
+        if (GetFileAttributesA(resolvedPath) != INVALID_FILE_ATTRIBUTES)
+        {
+            // Manual-map the DLL so it is completely hidden from anti-cheat:
+            //   - not in PEB module list
+            //   - PE headers zeroed after mapping
+            //   - per-section page protections applied
+            HMODULE hMapped = ManualMap(resolvedPath);
+            if (hMapped)
+                logprintf(">>Manual mapped: %s\n", resolvedPath);
+            else
+                logprintf(">>Manual map failed: %s\n", resolvedPath);
+        }
+    }
+
     loadPlugins("ASI");
     if(GetPluginLoadCount() == 0)
         loadPlugins(".");
@@ -223,6 +273,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     switch (fdwReason)
     {
         case DLL_PROCESS_ATTACH:
+            g_hInstance = hinstDLL;
             CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Start, 0, 0, 0);
             break;
         case DLL_PROCESS_DETACH:
@@ -232,6 +283,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     }
     return TRUE;
 }
+
+// ── Exported forwarding stubs ────────────────────────────────────────────────
+// GCC (Code::Blocks / TDM-GCC) uses inline AT&T assembly.
+// MSVC (Visual Studio) uses the MASM file winmm_stubs.asm instead;
+// those stubs are excluded here at compile time.
+#ifndef _MSC_VER
 
 extern "C" __declspec(dllexport) void CloseDriver()
 {
@@ -1312,3 +1369,4 @@ extern "C" __declspec(dllexport) void waveOutWrite()
     asm("jmp *p + 179 * 8");
 }
 
+#endif /* !_MSC_VER */
